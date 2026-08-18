@@ -115,7 +115,7 @@ Resources:
   RedshiftIAMRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: RedshiftDataEngineeringCertRole
+      RoleName: afnan-RedshiftDataEngineeringCertRole
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -126,7 +126,7 @@ Resources:
             Action:
               - sts:AssumeRole
       Policies:
-        - PolicyName: DataEngineeringCertRedShiftPolicy
+        - PolicyName: afnan-DataEngineeringCertRedShiftPolicy
           PolicyDocument:
             Version: "2012-10-17"
             Statement:

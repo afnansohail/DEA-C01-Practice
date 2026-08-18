@@ -9,7 +9,7 @@ Resources:
   MyAthenaWorkGroup:
     Type: AWS::Athena::WorkGroup
     Properties:
-      Name: DataEngineeringCourseAthenaWorkgroup
+      Name: afnan-DataEngineeringCourseAthenaWorkgroup
       Description: The workgroup for the data engeering course. 
       State: ENABLED
       WorkGroupConfiguration:

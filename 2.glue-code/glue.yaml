@@ -9,7 +9,7 @@ Resources:
     GlueIAMRole:
       Type: AWS::IAM::Role
       Properties:
-        RoleName: GlueDataEngineeringCertRole
+        RoleName: afnan-GlueDataEngineeringCertRole
         AssumeRolePolicyDocument:
           Version: "2012-10-17"
           Statement:
@@ -20,7 +20,7 @@ Resources:
               Action:
                 - sts:AssumeRole
         Policies:
-          - PolicyName: DataEngineeringCertGlueServicePolicy
+          - PolicyName: afnan-DataEngineeringCertGlueServicePolicy
             PolicyDocument:
               Version: "2012-10-17"
               Statement:
