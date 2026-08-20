@@ -231,10 +231,10 @@ A media analytics company runs a persistent EMR cluster with 1 master node, 6 co
 
 Which change should the data engineer make?
 
-A. Move all core and task nodes to Spot Instances to maximize savings.
-B. Move only the task nodes to Spot Instances, and keep the core nodes on On-Demand Instances.
-C. Move only the core nodes to Spot Instances, and keep the task nodes on On-Demand Instances.
-D. Move the master node to Spot Instances, since it does not store HDFS data.
+- A. Move all core and task nodes to Spot Instances to maximize savings.
+- B. Move only the task nodes to Spot Instances, and keep the core nodes on On-Demand Instances.
+- C. Move only the core nodes to Spot Instances, and keep the task nodes on On-Demand Instances.
+- D. Move the master node to Spot Instances, since it does not store HDFS data.
 
 **Answer: B**
 
@@ -246,10 +246,10 @@ A retail company runs a nightly batch job that transforms the previous day's sal
 
 Which cluster strategy should the data engineer implement?
 
-A. Launch a persistent EMR cluster once, and leave it running continuously so the nightly job always has warm capacity.
-B. Launch a transient EMR cluster each night through an orchestration tool, run the ETL steps, and let the cluster auto-terminate when the steps finish.
-C. Launch a persistent cluster and manually stop the underlying EC2 instances outside the nightly window.
-D. Launch a persistent cluster and rely on the `IsIdle` CloudWatch metric to alert the team so someone can manually terminate the cluster after each nightly run.
+- A. Launch a persistent EMR cluster once, and leave it running continuously so the nightly job always has warm capacity.
+- B. Launch a transient EMR cluster each night through an orchestration tool, run the ETL steps, and let the cluster auto-terminate when the steps finish.
+- C. Launch a persistent cluster and manually stop the underlying EC2 instances outside the nightly window.
+- D. Launch a persistent cluster and rely on the `IsIdle` CloudWatch metric to alert the team so someone can manually terminate the cluster after each nightly run.
 
 **Answer: B**
 
@@ -261,10 +261,10 @@ A data engineering team runs a single persistent EMR cluster that serves two wor
 
 What is the most likely explanation?
 
-A. `AppsRunning` is not a valid CloudWatch metric for EMR, so the scaling policy silently fails.
-B. Presto does not run on YARN, so a YARN-based metric like `AppsRunning` never reflects Presto's load.
-C. Custom scaling policies only work with instance fleets, and this cluster uses instance groups.
-D. EMR Managed Scaling must be enabled before any custom metric-based scaling policy can take effect.
+- A. `AppsRunning` is not a valid CloudWatch metric for EMR, so the scaling policy silently fails.
+- B. Presto does not run on YARN, so a YARN-based metric like `AppsRunning` never reflects Presto's load.
+- C. Custom scaling policies only work with instance fleets, and this cluster uses instance groups.
+- D. EMR Managed Scaling must be enabled before any custom metric-based scaling policy can take effect.
 
 **Answer: B**
 
@@ -276,10 +276,10 @@ A data engineer is designing a transient EMR Spark job. It reads a 500 GB raw da
 
 Which storage design meets the durability requirement while preserving good shuffle performance?
 
-A. Read input from S3 via EMRFS, use HDFS on the core nodes for shuffle/intermediate data, and write final output back to S3 via EMRFS.
-B. Read input from HDFS, shuffle in HDFS, and write final output to HDFS.
-C. Read input from S3 via EMRFS, shuffle in S3 via EMRFS, and write final output to S3 via EMRFS.
-D. Read input from HDFS, shuffle in S3 via EMRFS, and write final output to HDFS.
+- A. Read input from S3 via EMRFS, use HDFS on the core nodes for shuffle/intermediate data, and write final output back to S3 via EMRFS.
+- B. Read input from HDFS, shuffle in HDFS, and write final output to HDFS.
+- C. Read input from S3 via EMRFS, shuffle in S3 via EMRFS, and write final output to S3 via EMRFS.
+- D. Read input from HDFS, shuffle in S3 via EMRFS, and write final output to HDFS.
 
 **Answer: A**
 
@@ -291,11 +291,11 @@ A startup wants to run occasional Spark ETL jobs without maintaining any persist
 
 Which two statements about EMR Serverless are correct? (Choose TWO.)
 
-A. EMR Serverless supports Spark and Hive as application (runtime) types.
-B. EMR Serverless supports Spark, Hive, and Presto as application (runtime) types.
-C. An EMR Serverless application left in the STARTED state with no auto-stop configured continues to incur charges even when no job is currently running.
-D. Job runs are billed only while the application is in the CREATED state.
-E. EMR Serverless requires the data engineer to select EC2 instance types for its worker capacity.
+- A. EMR Serverless supports Spark and Hive as application (runtime) types.
+- B. EMR Serverless supports Spark, Hive, and Presto as application (runtime) types.
+- C. An EMR Serverless application left in the STARTED state with no auto-stop configured continues to incur charges even when no job is currently running.
+- D. Job runs are billed only while the application is in the CREATED state.
+- E. EMR Serverless requires the data engineer to select EC2 instance types for its worker capacity.
 
 **Answer: A, C**
 
@@ -307,10 +307,10 @@ A large enterprise already runs hundreds of microservices and machine learning b
 
 Which EMR deployment option should the team choose?
 
-A. EMR on EC2 with a persistent cluster
-B. EMR on EC2 with a transient cluster orchestrated by Step Functions
-C. EMR Serverless
-D. EMR on EKS
+- A. EMR on EC2 with a persistent cluster
+- B. EMR on EC2 with a transient cluster orchestrated by Step Functions
+- C. EMR Serverless
+- D. EMR on EKS
 
 **Answer: D**
 
@@ -322,10 +322,10 @@ A data engineering team is choosing an EMR deployment model for a new workload. 
 
 Which EMR deployment option best satisfies these requirements?
 
-A. EMR Serverless
-B. EMR on EKS
-C. EMR on EC2
-D. AWS Glue with a custom connector for HBase
+- A. EMR Serverless
+- B. EMR on EKS
+- C. EMR on EC2
+- D. AWS Glue with a custom connector for HBase
 
 **Answer: C**
 
@@ -337,11 +337,11 @@ A data engineering team needs a fully automated nightly pipeline: create a trans
 
 Which two actions should the data engineer take to meet these requirements? (Choose TWO.)
 
-A. Orchestrate the pipeline using AWS Step Functions with its built-in EMR service integrations.
-B. Orchestrate the pipeline using Amazon EventBridge rules that react to cluster state changes.
-C. Configure the EMR cluster to use the AWS Glue Data Catalog for Hive and Spark table metadata.
-D. Configure the EMR cluster to run its own dedicated Hive metastore on an Amazon RDS instance.
-E. Orchestrate the pipeline using AWS Glue Workflows.
+- A. Orchestrate the pipeline using AWS Step Functions with its built-in EMR service integrations.
+- B. Orchestrate the pipeline using Amazon EventBridge rules that react to cluster state changes.
+- C. Configure the EMR cluster to use the AWS Glue Data Catalog for Hive and Spark table metadata.
+- D. Configure the EMR cluster to run its own dedicated Hive metastore on an Amazon RDS instance.
+- E. Orchestrate the pipeline using AWS Glue Workflows.
 
 **Answer: A, C**
 

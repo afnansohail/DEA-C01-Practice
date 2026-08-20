@@ -327,10 +327,10 @@ A media analytics company ingests JSON clickstream logs into Amazon S3 every day
 
 Which AWS service should the data engineer use to meet these requirements?
 
-A. Store the schema in an Amazon DynamoDB table that each service queries before running its own job.
-B. Use the AWS Glue Data Catalog as the shared metadata store referenced by Athena, Redshift Spectrum, and Glue ETL jobs.
-C. Create an Amazon RDS database to hold copies of the schema and data-location metadata for each service.
-D. Configure Athena to maintain its own internal metastore, and export schema definitions to Redshift Spectrum and Glue on a schedule.
+- A. Store the schema in an Amazon DynamoDB table that each service queries before running its own job.
+- B. Use the AWS Glue Data Catalog as the shared metadata store referenced by Athena, Redshift Spectrum, and Glue ETL jobs.
+- C. Create an Amazon RDS database to hold copies of the schema and data-location metadata for each service.
+- D. Configure Athena to maintain its own internal metastore, and export schema definitions to Redshift Spectrum and Glue on a schedule.
 
 **Answer: B**
 
@@ -344,11 +344,11 @@ A retail company runs a crawler over order files in Amazon S3. The team wrote a 
 
 Which two configurations should the data engineer confirm or select? (Choose TWO.)
 
-A. Configure the crawler so custom classifiers run before built-in classifiers — a custom classifier that reaches a certainty score of 1.0 stops further evaluation.
-B. Set the schema `UpdateBehavior` to "Add new columns only" and `DeleteBehavior` to "Ignore the change and don't update the table" (LOG), so a temporary file removal doesn't delete partitions.
-C. Set `UpdateBehavior` to "Update the table definition in the Data Catalog" (`UPDATE_IN_DATABASE`), so removed columns are dropped automatically as soon as they're detected.
-D. Set `DeleteBehavior` to "Delete tables and partitions from the Data Catalog" (`DELETE_FROM_DATABASE`), so the Catalog always matches current S3 contents exactly.
-E. Configure built-in classifiers to run before custom classifiers, so common formats are always tried first.
+- A. Configure the crawler so custom classifiers run before built-in classifiers — a custom classifier that reaches a certainty score of 1.0 stops further evaluation.
+- B. Set the schema `UpdateBehavior` to "Add new columns only" and `DeleteBehavior` to "Ignore the change and don't update the table" (LOG), so a temporary file removal doesn't delete partitions.
+- C. Set `UpdateBehavior` to "Update the table definition in the Data Catalog" (`UPDATE_IN_DATABASE`), so removed columns are dropped automatically as soon as they're detected.
+- D. Set `DeleteBehavior` to "Delete tables and partitions from the Data Catalog" (`DELETE_FROM_DATABASE`), so the Catalog always matches current S3 contents exactly.
+- E. Configure built-in classifiers to run before custom classifiers, so common formats are always tried first.
 
 **Answer: A, B**
 
@@ -362,10 +362,10 @@ A data engineer configures a Glue ETL job to read from an Amazon RDS for Postgre
 
 What is the MOST likely cause of the timeout, and which change should the data engineer make?
 
-A. The subnet lacks a NAT gateway, and Glue jobs always require public internet access to establish a JDBC connection; add a NAT gateway to the route table.
-B. The security group attached to the connection is missing a self-referencing inbound rule, so the Glue-created elastic network interface (ENI) cannot reach the RDS instance within the same VPC; add an inbound rule allowing traffic from the security group itself.
-C. The Glue connection needs its own Elastic IP address so RDS can respond to it over the public internet; allocate an Elastic IP to the connection.
-D. AWS Glue cannot connect to Amazon RDS instances in a private subnet with no internet gateway; move the RDS instance to a public subnet.
+- A. The subnet lacks a NAT gateway, and Glue jobs always require public internet access to establish a JDBC connection; add a NAT gateway to the route table.
+- B. The security group attached to the connection is missing a self-referencing inbound rule, so the Glue-created elastic network interface (ENI) cannot reach the RDS instance within the same VPC; add an inbound rule allowing traffic from the security group itself.
+- C. The Glue connection needs its own Elastic IP address so RDS can respond to it over the public internet; allocate an Elastic IP to the connection.
+- D. AWS Glue cannot connect to Amazon RDS instances in a private subnet with no internet gateway; move the RDS instance to a public subnet.
 
 **Answer: B**
 
@@ -379,10 +379,10 @@ A logistics company writes daily order files to `s3://.../orders/year=2026/month
 
 Which solution addresses the immediate issue and reduces ongoing operational overhead going forward?
 
-A. Manually run `ALTER TABLE ... ADD PARTITION` in Athena after every job run, and continue this process daily.
-B. Schedule a Glue crawler to run after every job execution, so it discovers new partitions before analysts query the data.
-C. Enable Athena partition projection on the table, configured with the year/month/day naming convention, so Athena computes valid partitions at query time without needing Catalog partition entries.
-D. Re-create the "orders" table definition every day so Athena always reads fresh metadata.
+- A. Manually run `ALTER TABLE ... ADD PARTITION` in Athena after every job run, and continue this process daily.
+- B. Schedule a Glue crawler to run after every job execution, so it discovers new partitions before analysts query the data.
+- C. Enable Athena partition projection on the table, configured with the year/month/day naming convention, so Athena computes valid partitions at query time without needing Catalog partition entries.
+- D. Re-create the "orders" table definition every day so Athena always reads fresh metadata.
 
 **Answer: C**
 
@@ -396,11 +396,11 @@ A nightly Glue Spark batch job performs large aggregations and frequently fails 
 
 Which two changes should the data engineer make? (Choose TWO.)
 
-A. Switch the job's worker type to an R-family (memory-optimized) worker, which provides more memory per vCPU than the equivalent G-family size.
-B. Enable Glue Flex execution for the job, since it has no SLA on start or finish time and can tolerate variable capacity availability, lowering its per-DPU-hour cost.
-C. Switch the job's worker type to G.025X to reduce cost, since it is the cheapest DPU option Glue offers.
-D. Convert the job from a Spark job to a Python shell job, since Python shell jobs are billed at a lower DPU fraction.
-E. Enable Glue Flex execution and configure the job as a Spark Streaming job, since streaming jobs benefit most from Flex pricing.
+- A. Switch the job's worker type to an R-family (memory-optimized) worker, which provides more memory per vCPU than the equivalent G-family size.
+- B. Enable Glue Flex execution for the job, since it has no SLA on start or finish time and can tolerate variable capacity availability, lowering its per-DPU-hour cost.
+- C. Switch the job's worker type to G.025X to reduce cost, since it is the cheapest DPU option Glue offers.
+- D. Convert the job from a Spark job to a Python shell job, since Python shell jobs are billed at a lower DPU fraction.
+- E. Enable Glue Flex execution and configure the job as a Spark Streaming job, since streaming jobs benefit most from Flex pricing.
 
 **Answer: A, B**
 
@@ -414,10 +414,10 @@ A data engineering team currently uses an AWS Glue Workflow to chain three crawl
 
 Which AWS service should the data engineer use to orchestrate this expanded pipeline?
 
-A. Continue using AWS Glue Workflows, since workflow run properties can pass data between the Glue job and the Lambda function.
-B. Use AWS Step Functions, defining a state machine that calls the Glue job via `glue:startJobRun.sync`, then invokes the Lambda function with a `Choice` state for branching and `Retry`/`Catch` for error handling.
-C. Use Amazon EventBridge to chain the crawlers, jobs, and Lambda function into a single ordered DAG with retry logic.
-D. Deploy Amazon MWAA and author the pipeline as an Airflow DAG, since Airflow provides retries and branching out of the box.
+- A. Continue using AWS Glue Workflows, since workflow run properties can pass data between the Glue job and the Lambda function.
+- B. Use AWS Step Functions, defining a state machine that calls the Glue job via `glue:startJobRun.sync`, then invokes the Lambda function with a `Choice` state for branching and `Retry`/`Catch` for error handling.
+- C. Use Amazon EventBridge to chain the crawlers, jobs, and Lambda function into a single ordered DAG with retry logic.
+- D. Deploy Amazon MWAA and author the pipeline as an Airflow DAG, since Airflow provides retries and branching out of the box.
 
 **Answer: B**
 
@@ -431,10 +431,10 @@ A data engineering team wants to add automated data quality checks inside an exi
 
 Which solution should the data engineer use to meet these requirements MOST cost-effectively?
 
-A. Deploy the open-source Deequ framework on a new Amazon EMR cluster, and write custom completeness and uniqueness checks in PySpark.
-B. Add a Data Quality node inside the Glue Studio visual ETL job, write rules in DQDL, and use Glue's rule-recommendation feature to generate a starting ruleset from a data profile.
-C. Use AWS Glue DataBrew to profile the dataset and manually inspect the results, then translate the findings into custom PySpark assertions added to the ETL job.
-D. Enable Glue Data Quality's ML-powered anomaly detection on every column in the dataset instead of writing explicit completeness and uniqueness rules.
+- A. Deploy the open-source Deequ framework on a new Amazon EMR cluster, and write custom completeness and uniqueness checks in PySpark.
+- B. Add a Data Quality node inside the Glue Studio visual ETL job, write rules in DQDL, and use Glue's rule-recommendation feature to generate a starting ruleset from a data profile.
+- C. Use AWS Glue DataBrew to profile the dataset and manually inspect the results, then translate the findings into custom PySpark assertions added to the ETL job.
+- D. Enable Glue Data Quality's ML-powered anomaly detection on every column in the dataset instead of writing explicit completeness and uniqueness rules.
 
 **Answer: B**
 
@@ -448,10 +448,10 @@ A data analyst (not a data engineer) at an insurance company wants to explore a 
 
 Which AWS service is the BEST fit for this analyst's task?
 
-A. AWS Glue Studio visual editor, saving the generated PySpark script as the reusable transformation logic.
-B. AWS Glue DataBrew, using its profiling feature to detect potential PII and generate statistics, and saving the applied transformations as a reusable recipe.
-C. Amazon Athena, using `CREATE TABLE AS SELECT` statements to clean and transform the data.
-D. An AWS Glue crawler with a custom classifier configured to detect PII columns during cataloging.
+- A. AWS Glue Studio visual editor, saving the generated PySpark script as the reusable transformation logic.
+- B. AWS Glue DataBrew, using its profiling feature to detect potential PII and generate statistics, and saving the applied transformations as a reusable recipe.
+- C. Amazon Athena, using `CREATE TABLE AS SELECT` statements to clean and transform the data.
+- D. An AWS Glue crawler with a custom classifier configured to detect PII columns during cataloging.
 
 **Answer: B**
 
@@ -465,11 +465,11 @@ A Glue Spark job reads incrementally from an Amazon RDS for MySQL table over a J
 
 Which two explanations account for this behavior? (Choose TWO.)
 
-A. JDBC bookmarks track only new primary-key values in increasing or decreasing order; an `UPDATE` to an existing row's non-key columns doesn't change its primary key, so the bookmark never re-reads that row.
-B. That week's job run did not call `job.commit()` at the end, so the S3 bookmark state was never persisted, causing every S3 file to be reprocessed on the next run regardless of its last-modified timestamp.
-C. Job bookmarks are entirely incompatible with Amazon RDS as a source, so the JDBC portion of the job was never actually bookmarked.
-D. The S3 bookmark tracks file names rather than last-modified timestamps, and the reprocessed files simply had new names that week.
-E. Job bookmarks automatically perform change-data-capture on JDBC sources, so updated rows should have been picked up; this must be an unrelated bug outside of Glue.
+- A. JDBC bookmarks track only new primary-key values in increasing or decreasing order; an `UPDATE` to an existing row's non-key columns doesn't change its primary key, so the bookmark never re-reads that row.
+- B. That week's job run did not call `job.commit()` at the end, so the S3 bookmark state was never persisted, causing every S3 file to be reprocessed on the next run regardless of its last-modified timestamp.
+- C. Job bookmarks are entirely incompatible with Amazon RDS as a source, so the JDBC portion of the job was never actually bookmarked.
+- D. The S3 bookmark tracks file names rather than last-modified timestamps, and the reprocessed files simply had new names that week.
+- E. Job bookmarks automatically perform change-data-capture on JDBC sources, so updated rows should have been picked up; this must be an unrelated bug outside of Glue.
 
 **Answer: A, B**
 
@@ -483,10 +483,10 @@ A healthcare analytics company stores patient-derived datasets across many Glue 
 
 Which solution meets these requirements?
 
-A. Create a Glue Data Catalog resource policy granting the partner account access to the relevant tables, since resource policies support cross-account access.
-B. Use AWS Lake Formation to grant the partner account column-level and row-level permissions on the relevant tables, and adopt Lake Formation permissions as the single source of truth for data lake access control.
-C. Use AWS IAM policies alone, attached to a cross-account IAM role, to restrict the partner account to only the allowed columns and rows.
-D. Configure a Glue Data Catalog resource policy for the table-level grant, and a separate Lake Formation grant for the column- and row-level restriction, since both mechanisms can coexist.
+- A. Create a Glue Data Catalog resource policy granting the partner account access to the relevant tables, since resource policies support cross-account access.
+- B. Use AWS Lake Formation to grant the partner account column-level and row-level permissions on the relevant tables, and adopt Lake Formation permissions as the single source of truth for data lake access control.
+- C. Use AWS IAM policies alone, attached to a cross-account IAM role, to restrict the partner account to only the allowed columns and rows.
+- D. Configure a Glue Data Catalog resource policy for the table-level grant, and a separate Lake Formation grant for the column- and row-level restriction, since both mechanisms can coexist.
 
 **Answer: B**
 
