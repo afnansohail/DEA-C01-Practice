@@ -1,5 +1,5 @@
-Description: This template deploys a 1 node reshift cluster with a dc2.large type instance. This resouce will most likely run outside of the AWS free tier. 
-             The smallest instance type has been chosen to limit cost. This is cost ~$0.30 per hour. However, confirm by using the AWS instance pricing information. 
+Description: This template deploys a 1 node redshift cluster with a ra3.large type instance (dc2.large is no longer available for new clusters as of 2026). This resouce will most likely run outside of the AWS free tier.
+             Confirm the current hourly rate using the AWS instance pricing information before deploying.
 
 Parameters:
   DatabaseName:
@@ -60,9 +60,10 @@ Resources:
     DependsOn: RedshiftIAMRole
     Type: AWS::Redshift::Cluster
     Properties:
+      ClusterIdentifier: afnan-dea-c01
       ClusterType: single-node
       NumberOfNodes: 1
-      NodeType: dc2.large
+      NodeType: ra3.large
       DBName:
         Ref: DatabaseName
       MasterUsername:
@@ -132,10 +133,14 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
-                  - s3:GetObject
-                  - s3:ListObjects
+                  - s3:ListBucket
                 Resource:
                   Ref: DataEngineeringS3Arn
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource:
+                  Fn::Sub: "${DataEngineeringS3Arn}/*"
 
 
 Outputs:
