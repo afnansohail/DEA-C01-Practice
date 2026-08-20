@@ -195,3 +195,127 @@ The README notes that EMR can use the **AWS Glue Data Catalog** as its Hive-comp
 - Step Functions is the natural orchestrator for create-cluster → submit-steps → terminate-cluster because of its native EMR API integrations and built-in retry/wait semantics — same logic as the Glue orchestration comparison, applied to EMR.
 - Two separate EMR scaling features exist: custom scaling policy (you pick the metric, e.g. `AppsRunning`, `ContainerPendingRatio`, `YARNMemoryAvailablePercentage`) vs. EMR Managed Scaling (you set min/max only, EMR decides internally). Expect the exam to favor Managed Scaling as the recommended approach.
 - The Glue Data Catalog can serve as EMR's Hive-compatible metastore, shared across Hive, Spark, Presto/Trino, Athena, and Glue jobs.
+
+## Practice Questions
+
+### Q1
+
+A media analytics company runs a persistent EMR cluster with 1 master node, 6 core nodes, and 10 task nodes. The cluster caches datasets and stores Spark shuffle data directly in HDFS across the core nodes. A data engineer wants to cut compute cost by moving as many nodes as possible onto EC2 Spot Instances. Leadership has approved the cost optimization but will not accept any chance of losing cluster-stored data or destabilizing HDFS.
+
+Which change should the data engineer make?
+
+A. Move all core and task nodes to Spot Instances to maximize savings.
+B. Move only the task nodes to Spot Instances, and keep the core nodes on On-Demand Instances.
+C. Move only the core nodes to Spot Instances, and keep the task nodes on On-Demand Instances.
+D. Move the master node to Spot Instances, since it does not store HDFS data.
+
+**Answer: B**
+
+Task nodes run compute only and never store HDFS blocks, so a Spot interruption on a task node only costs re-computation — YARN reschedules the lost work and no data is lost. Core nodes store HDFS blocks, so interrupting them risks losing a replica of that data (and forces re-replication); keeping them on On-Demand protects durability. A puts the core nodes at risk. C is backwards — it protects the wrong node type. D is wrong for a different reason: the master node coordinates the entire cluster (ResourceManager, NameNode), so losing it risks taking down the whole cluster, not just one replica of data — it is the last node type you would ever put on Spot.
+
+### Q2
+
+A retail company runs a nightly batch job that transforms the previous day's sales data. The job takes about 40 minutes and runs once every 24 hours. No one queries or needs cluster capacity outside that nightly window. The finance team has asked the data engineering team to minimize idle compute cost while still meeting the nightly processing SLA.
+
+Which cluster strategy should the data engineer implement?
+
+A. Launch a persistent EMR cluster once, and leave it running continuously so the nightly job always has warm capacity.
+B. Launch a transient EMR cluster each night through an orchestration tool, run the ETL steps, and let the cluster auto-terminate when the steps finish.
+C. Launch a persistent cluster and manually stop the underlying EC2 instances outside the nightly window.
+D. Launch a persistent cluster and rely on the `IsIdle` CloudWatch metric to alert the team so someone can manually terminate the cluster after each nightly run.
+
+**Answer: B**
+
+This is exactly the transient-cluster use case: a scheduled, one-off batch job with a clear start and end. Pay only for the ~40 minutes the job runs, and the cluster auto-terminates — no idle cost, no manual cleanup. A pays for roughly 23 idle hours every day. D turns the `IsIdle` metric (a tool for noticing an idle persistent cluster) into a manual daily chore, which still leaves cluster management overhead and does not minimize cost as directly as a transient cluster. C is not a standard, supported way to pause an active EMR cluster's billing and still leaves cluster infrastructure provisioned.
+
+### Q3
+
+A data engineering team runs a single persistent EMR cluster that serves two workloads at once: a scheduled Spark ETL pipeline, and an ad hoc Presto SQL layer that analysts query throughout the business day. To handle bursts of Presto traffic, the team configured EMR automatic scaling with a custom policy that scales the core instance group out whenever the `AppsRunning` metric reaches a threshold. During a period of heavy Presto query load, cluster performance degrades noticeably, yet the `AppsRunning` alarm never breaches and EMR never scales out.
+
+What is the most likely explanation?
+
+A. `AppsRunning` is not a valid CloudWatch metric for EMR, so the scaling policy silently fails.
+B. Presto does not run on YARN, so a YARN-based metric like `AppsRunning` never reflects Presto's load.
+C. Custom scaling policies only work with instance fleets, and this cluster uses instance groups.
+D. EMR Managed Scaling must be enabled before any custom metric-based scaling policy can take effect.
+
+**Answer: B**
+
+`AppsRunning` counts YARN applications. Presto manages its own resources outside YARN, so Presto query load never shows up as a YARN application and never moves this metric — the cluster genuinely looks idle to the scaling policy even while Presto is under heavy load. A is false: `AppsRunning` is a real EMR CloudWatch metric (namespace `AWS/ElasticMapReduce`). C reverses the actual rule — custom scaling policies work only with instance groups, not instance fleets, so a cluster using instance groups is exactly where a custom policy is expected to apply. D is invented; Managed Scaling and custom scaling policies are two independent, mutually exclusive mechanisms, not a prerequisite chain.
+
+### Q4
+
+A data engineer is designing a transient EMR Spark job. It reads a 500 GB raw dataset, performs wide transformations (joins and aggregations) that shuffle data between stages, and writes final aggregated output for other teams to consume. The cluster terminates automatically once the job finishes. The data engineer must decide, separately, where the input, the shuffle/intermediate data, and the final output should each live during the run.
+
+Which storage design meets the durability requirement while preserving good shuffle performance?
+
+A. Read input from S3 via EMRFS, use HDFS on the core nodes for shuffle/intermediate data, and write final output back to S3 via EMRFS.
+B. Read input from HDFS, shuffle in HDFS, and write final output to HDFS.
+C. Read input from S3 via EMRFS, shuffle in S3 via EMRFS, and write final output to S3 via EMRFS.
+D. Read input from HDFS, shuffle in S3 via EMRFS, and write final output to HDFS.
+
+**Answer: A**
+
+This is the standard well-designed EMR pattern: EMRFS (S3) for durable input and output because the data must survive the cluster's termination, and HDFS for intermediate shuffle data because it is fast local disk I/O rather than network calls to S3. B loses the final output the moment the transient cluster terminates, since HDFS data lives and dies with the cluster. C is durable end-to-end but pays a network-I/O performance penalty for every shuffle write/read, which HDFS is specifically better suited for. D is an inconsistent mix that still loses the final output on termination and gains nothing from routing shuffle traffic through S3.
+
+### Q5 (Choose TWO)
+
+A startup wants to run occasional Spark ETL jobs without maintaining any persistent infrastructure. Jobs run a few times a day, each taking 10-20 minutes, and workload volume is unpredictable. The team wants to pay only for compute actually consumed during job execution, and does not want to choose EC2 instance types, size a cluster, or define a scaling policy. They are evaluating EMR Serverless.
+
+Which two statements about EMR Serverless are correct? (Choose TWO.)
+
+A. EMR Serverless supports Spark and Hive as application (runtime) types.
+B. EMR Serverless supports Spark, Hive, and Presto as application (runtime) types.
+C. An EMR Serverless application left in the STARTED state with no auto-stop configured continues to incur charges even when no job is currently running.
+D. Job runs are billed only while the application is in the CREATED state.
+E. EMR Serverless requires the data engineer to select EC2 instance types for its worker capacity.
+
+**Answer: A, C**
+
+EMR Serverless supports exactly two application types: Spark and Hive — not Presto, which runs on EMR on EC2 or separately as Athena (B is wrong). An application can sit in the STARTED state indefinitely without auto-stopping; you are billed for the resources it holds while STARTED, so an idle STARTED application still costs money until it is explicitly stopped or terminated (C is correct). D is wrong: CREATED means the application exists but has not provisioned any capacity yet, so nothing is billed there — billing happens once the application is STARTED and jobs run. E is wrong: not choosing instance types is the entire point of EMR Serverless — you pick only a release version and a runtime type.
+
+### Q6
+
+A large enterprise already runs hundreds of microservices and machine learning batch jobs on a shared Amazon EKS cluster. Platform engineering requires new workloads to run inside this same Kubernetes environment so they inherit consistent namespace isolation, RBAC, and monitoring tooling. A data engineering team now needs to add Spark-based ETL jobs, and wants those jobs to share the existing cluster's capacity and operational tooling rather than stand up a separate EMR-managed fleet of EC2 instances.
+
+Which EMR deployment option should the team choose?
+
+A. EMR on EC2 with a persistent cluster
+B. EMR on EC2 with a transient cluster orchestrated by Step Functions
+C. EMR Serverless
+D. EMR on EKS
+
+**Answer: D**
+
+EMR on EKS runs EMR workloads — primarily Spark — on an existing EKS cluster through a virtual cluster mapped to a Kubernetes namespace. It is the option built for exactly this situation: an organization already standardized on Kubernetes that wants big-data jobs to share the same cluster capacity, namespace isolation, and operational tooling instead of running EMR as a separate silo. A and B both provision a wholly separate EMR-managed EC2 fleet, which is precisely what the team wants to avoid. C provisions AWS-managed serverless capacity with no relationship at all to the company's existing EKS namespaces or RBAC model.
+
+### Q7
+
+A data engineering team is choosing an EMR deployment model for a new workload. Requirements: (1) run Spark, Hive, and HBase together on one cluster, with fine-grained control over instance types and bootstrap actions; (2) the team has deep in-house Hadoop administration expertise and wants to tune configuration at the OS/JVM level when needed; (3) the organization does not use Kubernetes anywhere today.
+
+Which EMR deployment option best satisfies these requirements?
+
+A. EMR Serverless
+B. EMR on EKS
+C. EMR on EC2
+D. AWS Glue with a custom connector for HBase
+
+**Answer: C**
+
+Only EMR on EC2 offers full framework flexibility — Hadoop, Spark, Hive, Presto, HBase, Flink all on one cluster — plus the highest degree of operational control: instance types, node counts, bootstrap actions, and scaling rules are all tunable. EMR Serverless supports only Spark and Hive as application types, has no HBase support, and deliberately removes instance/infrastructure-level tuning — the opposite of requirement (2). EMR on EKS needs an existing Kubernetes investment the organization doesn't have, and it is primarily built around Spark, not HBase. AWS Glue is a serverless ETL service; it does not run HBase workloads at all.
+
+### Q8 (Choose TWO)
+
+A data engineering team needs a fully automated nightly pipeline: create a transient EMR cluster, run a sequence of Spark and Hive steps against data in S3, and terminate the cluster once the steps finish. Table definitions created by the Hive step must be immediately visible to Athena and to the team's existing Glue ETL jobs, with no manual metadata synchronization. The team also wants an orchestration approach with native, built-in EMR API integration (create cluster, add step, wait for completion, terminate) and minimal custom code.
+
+Which two actions should the data engineer take to meet these requirements? (Choose TWO.)
+
+A. Orchestrate the pipeline using AWS Step Functions with its built-in EMR service integrations.
+B. Orchestrate the pipeline using Amazon EventBridge rules that react to cluster state changes.
+C. Configure the EMR cluster to use the AWS Glue Data Catalog for Hive and Spark table metadata.
+D. Configure the EMR cluster to run its own dedicated Hive metastore on an Amazon RDS instance.
+E. Orchestrate the pipeline using AWS Glue Workflows.
+
+**Answer: A, C**
+
+Step Functions has direct, built-in service integrations for the EMR API — create cluster, add steps, wait for completion, terminate cluster — with native retry/catch handling and no custom glue code, making it the natural fit for a create-run-terminate sequence. Pointing the cluster's Hive and Spark table metadata at the Glue Data Catalog gives one shared metastore that Athena and Glue jobs already read from, so new tables appear everywhere without manual syncing. B is wrong: EventBridge is event-driven/reactive, not a sequence orchestrator, and is a poor fit for "do A, then B, then C, then clean up." D technically stores metadata, but a dedicated RDS-backed Hive metastore is not automatically visible to Athena or Glue jobs — it requires separate integration work, which contradicts the "no manual synchronization" requirement. E is wrong: Glue Workflows orchestrate Glue's own components (crawlers, Glue jobs, triggers), not EMR clusters or steps.

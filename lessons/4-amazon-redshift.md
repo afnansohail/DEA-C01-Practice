@@ -230,3 +230,141 @@ Lets you query data sitting in S3 directly, using ordinary SQL from your Redshif
 - System objects: STL = persisted log history (limited retention). STV = current in-memory snapshot. SVV = view over STV. SVL = view over STL, main cluster only. SVCS = like SVL but includes concurrency-scaling clusters too. SYS = monitoring for provisioned clusters and Serverless.
 - Redshift Serverless: capacity in RPUs, no manual WLM, private-by-default since Jan 2025 but a public-accessible toggle does exist (README's "no public endpoints" claim is outdated).
 - Redshift Spectrum: queries S3 data registered in the Glue Data Catalog, runs on separate Redshift-managed compute outside your cluster — doesn't consume your cluster's WLM capacity.
+
+---
+
+## Practice Questions
+
+10 original, scenario-based questions modeled on the DEA-C01 exam format, covering the highest-yield topics from the sections above. Answers and explanations are based only on the facts established in this file.
+
+### Q1 — OLAP vs OLTP workload placement
+
+A ride-sharing company has two distinct workloads. The first is the live trip-booking system, which needs to insert and update individual ride records within milliseconds as riders request trips, drivers accept, and trips complete, with thousands of small transactions per second. The second is a nightly analytics job that scans two years of historical trip and payment data, aggregating it into revenue and utilization reports for the finance team. The data engineering team must choose the right AWS service for each workload, matching the workload's read/write pattern and schema design to the service it's built for. Which pairing correctly matches each workload to the AWS service designed for it?
+
+A. Use Amazon Redshift for the live booking system (row-store, low-latency single-row transactions) and Amazon Aurora for the nightly analytics reports (columnar, large aggregate scans).
+B. Use Amazon Aurora for the live booking system (normalized schema, low-latency single-row transactions) and Amazon Redshift for the nightly analytics reports (denormalized/columnar, large aggregate scans).
+C. Use Amazon Redshift for both workloads, since Redshift is designed to handle Online Transaction Processing (OLTP) as well as analytical workloads.
+D. Use Amazon Aurora for both workloads, since Aurora automatically switches between row-store and columnar storage depending on the query pattern.
+
+**Answer: B**
+
+Aurora is built for OLTP: normalized schema, row storage, fast low-latency single-row reads/writes, high transaction concurrency. Redshift is built for OLAP: denormalized/star schema, columnar storage, large scans and aggregations. A reverses this pairing. C repeats a common misconception — Redshift is OLAP, not OLTP, and is comparatively slow at single-row inserts/updates because it is optimized for scanning and aggregating column ranges, not for transactional row-level operations. D describes a capability Aurora does not have; it does not automatically switch storage engines based on query pattern.
+
+### Q2 — Architecture: leader node, slices, and system tables
+
+A data engineering team at a logistics company runs a large join query against a 12-node RA3 cluster. The query's execution time is far higher than expected, and the team suspects that one particular compute node is doing much more work than the others because of uneven data distribution across slices. They want to inspect a Redshift system object right now to confirm the current, real-time distribution of table blocks across slices, without waiting on anything written to disk. They also want to understand, at a conceptual level, why an imbalance on even a single slice can slow down the entire query. Which combination of a system object and an architectural explanation is correct?
+
+A. Query STV_BLOCKLIST, which reflects current in-memory slice/block state; the query's total runtime is bounded by its slowest slice, because the leader node must wait for every slice to finish before it aggregates and returns the final result.
+B. Query STL_QUERY, which reflects historical log data persisted to disk; the leader node stores all table data itself, so an imbalance in the leader node's storage explains the slowdown.
+C. Query SVL_QLOG, which is scoped to the main cluster's persisted logs; any slice imbalance is automatically corrected by concurrency-scaling clusters before the query completes.
+D. Query SYS_QUERY_HISTORY; slices are a Redshift Serverless-only concept, so this imbalance could not occur on a provisioned RA3 cluster.
+
+**Answer: A**
+
+STV tables hold current, in-memory, non-persisted state, so they answer "what's true right now" without needing disk-persisted logs. Architecturally, compute nodes execute in parallel across slices, but the leader node coordinates and performs final aggregation only after every slice returns its portion of the work — so the slowest slice sets the pace for the whole query. B is wrong on two counts: STL is disk-persisted log data, not real-time, and the leader node does not store table data — compute nodes do. C is wrong: SVL is also disk-log-based, not real-time, and concurrency-scaling clusters burst extra query capacity when queueing occurs — they do not detect or correct data-distribution skew. D is wrong: slices exist on provisioned clusters too (every compute node is split into slices); SYS views do cover both provisioned and Serverless, but the claim that slices are Serverless-only is false.
+
+### Q3 — Resize methods: migrating off a deprecated node type with zero downtime
+
+A subscription analytics company runs a single production DC2 cluster that serves live customer-facing dashboards around the clock. Because of DC2's upcoming end-of-life, the data engineering team must move this workload onto an RA3 node type before the deprecation deadline. The dashboards have a strict requirement: no read/write downtime or read-only period is acceptable at any point during the migration, even briefly. The team has budget approval to run a second cluster temporarily to achieve this. Which solution will meet these requirements with the LEAST impact to the live dashboards?
+
+A. Perform an Elastic resize on the existing cluster directly from DC2 to the target RA3 node type and size.
+B. Perform a Classic resize on the existing cluster directly from DC2 to the target RA3 node type and size.
+C. Take a snapshot of the DC2 cluster, restore it to a new RA3 cluster, validate it, then cut dashboard traffic over to the new cluster before decommissioning the old one.
+D. Enable Concurrency Scaling on the DC2 cluster so a transient cluster absorbs traffic during the migration window.
+
+**Answer: C**
+
+Snapshot & Restore keeps the original cluster fully available for read and write the entire time, since traffic only cuts over once the new RA3 cluster is validated and ready — this is the only option with no downtime window at all. A is wrong: Elastic resize is meant for changing node count (mostly within the same node type/family) with only a brief connection interruption; it is not the tool for a full DC2-to-RA3 family migration under a strict zero-read-only-downtime constraint. B is wrong: Classic resize can change node type, but it puts the cluster into read-only mode for the duration of the resize — potentially hours — which directly violates "no downtime, even briefly." D is wrong: Concurrency Scaling adds transient compute for queueing spikes on an already-running cluster; it does not perform a node type migration and cannot substitute for a resize.
+
+### Q4 — Distribution style and DISTKEY skew
+
+A data engineer distributes a 2-billion-row fact table using `DISTKEY(order_status)`, where `order_status` has only four possible values and 85% of rows are `"completed"`. Query performance is poor: system tables show one slice consistently holding and processing far more data than the others, and queries scanning this table run much slower than expected. The table is frequently joined to a customer dimension table on `customer_id`, which has high cardinality. Which distribution style should the data engineer choose to resolve this?
+
+A. `DISTSTYLE ALL`, so the full table is copied to every node.
+B. `DISTSTYLE KEY` with `DISTKEY(customer_id)`.
+C. `DISTSTYLE EVEN`, so rows are spread round-robin across slices.
+D. Keep `DISTKEY(order_status)`, but add a compound sort key on `customer_id`.
+
+**Answer: B**
+
+`order_status` has low cardinality and a heavily skewed value distribution, which is exactly the skew failure mode: most rows hash to the same slice(s), so that slice does disproportionate work and storage. `customer_id` has high cardinality (avoiding skew) and is the join column used against the customer dimension (avoiding redistribution/broadcast cost at join time), making it the correct DISTKEY. A is wrong: `ALL` copies the entire table to every node, which is meant for small, slow-changing dimension tables, not a 2-billion-row fact table — the write cost alone would be prohibitive. C is wrong: `EVEN` fixes the skew but ignores column values entirely, so it loses join co-location with the customer dimension and forces redistribution on every join. D is wrong: a sort key changes the on-disk order of rows within a slice; it does not change which slice a row lives on, so it does nothing to fix distribution skew.
+
+### Q5 — COPY, manifests, and ingestion patterns
+
+A healthcare data engineering team loads daily lab-result files into Redshift with COPY. For regulatory audit purposes, each load must ingest an exact, verifiable list of source files, because files sometimes land with inconsistent naming and are split across two S3 buckets used by different lab partners. Using a simple prefix match on file names would risk missing files or accidentally including unrelated ones. The team also wants the load to remain parallelized across the cluster's slices. Which COPY approach should the team use?
+
+A. Run COPY with a manifest file that explicitly lists every intended S3 object key across both buckets.
+B. Run COPY twice, once per bucket, using each bucket's root as the source prefix.
+C. Concatenate all incoming files into a single large file in one bucket, then run COPY against that one file.
+D. Enable Redshift Auto-Copy on both buckets so any new file is loaded automatically.
+
+**Answer: A**
+
+A manifest file is designed for exactly this scenario: inconsistent file naming, a need for an exact and auditable list of files, and files spread across multiple buckets or prefixes that a simple prefix match cannot express. Files listed in a manifest still load in parallel across slices. B is wrong: bucket-root prefix matching does not guarantee that only the intended files load, and does not satisfy the audit requirement for an exact file list. C is wrong: loading a single concatenated file forces a single slice to do all the work, eliminating COPY's parallelism, and adds an unnecessary manual step. D is wrong: Auto-Copy automatically triggers a COPY when new files land, but by itself it does not restrict a load to an audited, exact set of files — it does not solve the inconsistent-naming/exact-list requirement.
+
+### Q6 — Cross-region snapshot copy ordering
+
+A logistics company runs a KMS-encrypted Redshift cluster in us-east-1 that stores critical shipment and billing data. For disaster recovery compliance, the company must ensure that both automated and manual snapshots of this cluster are asynchronously copied to us-west-2 on an ongoing basis. No cross-region copy configuration exists yet in either region, and no destination-region KMS key exists yet either. Each step in this setup depends on a resource created in the previous step. Which combination of steps, in order, should the data engineer take to meet this requirement?
+
+A. Enable cross-region snapshot copy in us-east-1 → create a snapshot copy grant in us-west-2 → create a KMS key in us-west-2.
+B. Create a KMS key in us-west-2 → create a snapshot copy grant in us-west-2 referencing that key → enable cross-region snapshot copy in us-east-1 referencing the grant.
+C. Create a KMS key in us-east-1 → create a snapshot copy grant in us-east-1 → enable cross-region snapshot copy from us-west-2.
+D. Create a snapshot copy grant in us-west-2 → create a KMS key in us-west-2 referencing the grant → enable cross-region snapshot copy in us-east-1.
+
+**Answer: B**
+
+The dependency chain runs strictly forward: a destination-region KMS key must exist first, since encryption keys are regional and nothing can be encrypted with a key that doesn't exist yet. Next, a snapshot copy grant in the destination region names that key, authorizing Redshift to use it for re-encryption. Finally, cross-region copy is enabled on the source cluster in us-east-1, referencing that grant, which starts the ongoing replication. A is wrong: it enables copying before the grant or key exist, which is backwards. C is wrong: the key and grant must be created in the destination region (us-west-2), not the source region — a source-region key cannot encrypt data in the destination region. D is wrong: the grant is created before the key it needs to reference exists, which is not possible.
+
+### Q7 — WLM, Concurrency Scaling, and SQA (Choose TWO)
+
+An online learning platform's Redshift cluster mixes fast dashboard queries (sub-second, high frequency) with a handful of long-running nightly ETL transformations, all currently competing in the same default WLM queue. Dashboard users increasingly complain that their queries sit behind the long ETL jobs for minutes at a time. Separately, during monthly peak enrollment periods, the number of concurrent read-only reporting queries spikes far beyond normal, and the team wants extra query capacity available automatically during those spikes without keeping that capacity provisioned year-round. The team wants the lowest-maintenance solution and does not want to manually tune queue slot counts or memory allocations. Which two actions should the data engineering team take? (Choose TWO.)
+
+A. Enable Short Query Acceleration (SQA), so Redshift's ML-based prediction routes short dashboard queries to a dedicated execution path instead of waiting behind long ETL jobs.
+B. Switch the cluster to Manual WLM and create a dedicated queue with a fixed, generously sized slot count exclusively for dashboard queries.
+C. Enable Concurrency Scaling on the queue serving reporting queries, so Redshift automatically adds transient clusters only when queueing is detected during enrollment spikes.
+D. Permanently increase the base cluster's node count to handle the highest observed enrollment-period concurrency.
+E. Disable WLM queueing entirely so every query executes immediately regardless of resource contention.
+
+**Answer: A, C**
+
+SQA predicts short-running queries and gives them a dedicated fast path so they bypass the queue behind long ETL jobs, with no manual tuning required. Concurrency Scaling bursts extra transient clusters automatically only when a queue would otherwise back up, which is exactly the "capacity on demand, not provisioned year-round" requirement for the enrollment spikes. B is wrong: it explicitly requires manually tuning slot counts, contradicting the "lowest-maintenance, no manual tuning" requirement. D is wrong: permanently sizing the cluster for peak enrollment wastes cost during the rest of the month — this is precisely the cost problem Concurrency Scaling avoids. E is wrong: disabling WLM removes all prioritization and resource control, which does not target the short-query starvation problem and risks worse contention overall.
+
+### Q8 — RA3 vs legacy node families, and Data Sharing
+
+A company operates two Redshift clusters on DC2 node types: one owned by the finance team, one owned by the marketing team. The marketing team wants read access to several of finance's fact tables, live and without copying the data or building an ETL pipeline, and finance wants to avoid paying for marketing's query compute. When the finance team attempts to create a datashare, the operation fails. What is the most likely root cause, and what should the finance team do to enable this pattern while keeping compute billing separate?
+
+A. Data Sharing requires the producer cluster to use RA3 (or Redshift Serverless), because it depends on Redshift Managed Storage, which DC2 does not have; migrate the finance cluster to RA3, then create the datashare — marketing's own cluster will be billed for its own compute against the shared data.
+B. Data Sharing requires both clusters to be the exact same DC2 node size; resize the marketing cluster to match finance's node type and size.
+C. Data Sharing only works within a single AWS account and cannot involve a separate marketing cluster; merge both teams onto one shared cluster instead.
+D. Data Sharing requires Concurrency Scaling to be enabled on the producer cluster so it can serve external consumer queries.
+
+**Answer: A**
+
+Data Sharing is built on Redshift Managed Storage, so it is supported on RA3 (all provisioned sizes) and Redshift Serverless, but not on DC2/DS2. Migrating finance's cluster to RA3 unblocks the datashare. The billing model already keeps compute separate: the producer pays for storage once, and each consumer pays for its own compute when querying the shared data — so marketing's cluster, not finance's, bears its own query cost. B is wrong: producer and consumer node type/size do not need to match. C is wrong: Data Sharing is explicitly designed to work across separate clusters (and even across accounts and regions) — that is the point of the feature. D is wrong: Concurrency Scaling bursts capacity for queueing on a single cluster; it is unrelated to enabling Data Sharing.
+
+### Q9 — Federated Queries vs Zero-ETL vs Spectrum
+
+A subscription company keeps its live order and customer-profile data in an Aurora PostgreSQL database that supports its production application. The data engineering team wants to run a one-off exploratory SQL query from Redshift that joins this live Aurora order data against Redshift's historical sales aggregates, to answer an ad hoc question from finance today. They do not want to build a new ETL pipeline or provision ongoing replication just for one exploratory query, and Redshift must authenticate to Aurora securely without embedding database credentials in SQL or Glue code. Which combination of steps should the data engineer take to meet these requirements?
+
+A. Build a new AWS Glue job that extracts the Aurora table nightly into S3, then COPY it into a Redshift staging table before joining.
+B. Set up a Zero-ETL integration from Aurora to Redshift, wait for the initial replication to complete, then join the replicated table against the sales aggregates.
+C. Store the Aurora database credentials in AWS Secrets Manager, create an IAM role authorizing Redshift to retrieve that secret, then create an `EXTERNAL SCHEMA` in Redshift referencing the secret (`SECRET_ARN`) to query the live Aurora data directly in the join.
+D. Register the Aurora table as an external table in the AWS Glue Data Catalog and query it through Redshift Spectrum.
+
+**Answer: C**
+
+This is the Federated Queries mechanism: an `EXTERNAL SCHEMA` maps to the remote Aurora schema, credentials come from Secrets Manager via `SECRET_ARN`, and an IAM role authorizes retrieval — letting Redshift query live Aurora data in one query, with no data movement and no credentials embedded in code, ideal for a one-off exploratory need. A is wrong: building a Glue ETL job for a single ad hoc query is exactly the ongoing-pipeline overhead the requirement says to avoid. B is wrong: Zero-ETL is a continuous, ongoing replication mechanism that takes time to initialize; it is overkill for a one-off query and not "without ongoing replication." D is wrong: Redshift Spectrum queries data registered in the Glue Data Catalog, which is the pattern for S3-based files, not for live queries directly against an operational relational database like Aurora.
+
+### Q10 — Redshift Serverless and Redshift Spectrum (Choose TWO)
+
+A media analytics company has two requirements. First, they want to query five years of historical clickstream data sitting in S3 as Parquet files, joined against current Redshift tables, without loading the historical data into the cluster or consuming the cluster's own WLM query slots. Second, their nightly batch reporting workload is highly unpredictable in size — some nights it needs heavy compute for two hours, other nights it barely runs — and they do not want to provision or manage cluster nodes for this workload, nor pay for idle capacity. Which two Redshift capabilities should the data engineering team use to meet these two requirements, respectively? (Choose TWO.)
+
+A. Use Redshift Spectrum to query the S3 Parquet data as external tables registered in the AWS Glue Data Catalog, executed on a separate Redshift-managed compute fleet.
+B. Use Redshift Serverless, which scales RPU capacity automatically and bills only for RPU-seconds consumed, for the unpredictable nightly workload.
+C. Use Concurrency Scaling to add transient clusters whenever the unpredictable nightly job runs.
+D. Use a Zero-ETL integration to continuously replicate the S3 clickstream data into the cluster.
+E. Use a manifest-based COPY job to load the five years of Parquet data into the cluster once, then query it locally.
+
+**Answer: A, B**
+
+Redshift Spectrum satisfies requirement one exactly: it queries S3 data registered in the Glue Data Catalog on a separate, Redshift-managed compute fleet, so it does not consume the cluster's own WLM slots or require loading the data in first. Redshift Serverless satisfies requirement two: it scales RPU capacity automatically to match demand and bills only for RPU-seconds actually used, with no nodes to provision or manage and no cost for idle capacity. C is wrong: Concurrency Scaling adds transient capacity to an existing provisioned cluster's queue when queueing occurs — the base provisioned cluster still runs (and bills) continuously, so it does not eliminate idle-capacity cost the way Serverless does. D is wrong: Zero-ETL integrations replicate from sources like Aurora into Redshift, not from arbitrary S3 files, and replicating would mean loading the data rather than querying it in place. E is wrong: this loads and duplicates the data into the cluster, which directly violates the "without loading" requirement, and does nothing to address the elastic-compute requirement.

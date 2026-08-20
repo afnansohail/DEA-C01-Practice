@@ -278,3 +278,95 @@ One-line exam heuristic: **"quick SQL on S3, no infra" → Athena. "Already on R
 - `UNION` removes duplicate rows (costs more); `UNION ALL` keeps duplicates (cheaper) — default to `UNION ALL` unless you need de-duplication.
 - `HAVING` filters after `GROUP BY` aggregation; `WHERE` filters before aggregation and cannot reference an aggregate function.
 - `AND` binds tighter than `OR` — always parenthesize mixed conditions.
+
+---
+
+## Practice Questions
+
+**Q1.** A retail analytics company runs a small number of ad hoc Athena queries per week against its S3 data lake. Query volume is unpredictable: some weeks have almost no queries, other weeks bring a short burst of large reports for month-end close. The finance team wants Athena spend to track actual usage closely and does not want to pay for reserved compute that sits idle between bursts. Which billing configuration should the data engineer choose?
+
+A. Configure a Capacity Reservation with a fixed number of DPUs sized for the month-end burst.
+B. Leave Athena on its default on-demand pricing model, billed per amount of data scanned.
+C. Provision a permanently running Amazon EMR cluster sized for peak load and migrate the queries to it.
+D. Purchase Redshift Reserved Nodes and query the S3 data through Redshift Spectrum instead.
+
+**Answer: B.** On-demand pricing charges per TB scanned with no charge when idle — exactly what a spiky, low-average workload needs. Provisioned capacity (A) means paying for reserved DPU-hours even in weeks with almost no queries, the opposite of the finance goal. C replaces a serverless service with a cluster the team must size and keep running, adding idle cost and operational overhead. D introduces a second running service (Redshift) that also incurs cost while idle, and does not fit a workload with no existing Redshift footprint.
+
+---
+
+**Q2.** A data engineering team has a Glue Crawler that runs nightly and populates a table named `raw_events` in a Glue database by scanning a raw S3 prefix. The next morning, a separate analytics team wants to run SQL directly in Athena against that same table, with no additional table creation, schema replication, or export step. Which statement correctly describes what the analytics team can do?
+
+A. They must first run `CREATE EXTERNAL TABLE` in Athena, because Athena keeps its own metadata store that is separate from the Glue Data Catalog.
+B. They can query the crawler-discovered table immediately in Athena, because Athena's metastore is the same Glue Data Catalog the crawler writes to.
+C. They must export the crawler's schema into an Athena-native catalog using AWS DMS before they can query it.
+D. They can query the table only after enabling Athena Federated Query, since crawler-created tables are outside Athena's reach.
+
+**Answer: B.** Athena has no metadata store of its own — it reads and writes the same Glue Data Catalog that a Glue Crawler populates, so a crawler-discovered table is immediately queryable with no extra step. A is wrong because it invents a separate Athena metastore that does not exist. C invents an unnecessary migration step; DMS is for database replication, not catalog metadata. D is wrong because Federated Query is for non-S3 sources reached through Lambda connectors, not for S3 tables already in the Glue Data Catalog.
+
+---
+
+**Q3.** A shared AWS account is used by several project teams running Athena queries against a common S3 data lake. A platform team wants every team's workgroup to (1) hard-stop any single query that would scan more than a fixed number of bytes, protecting against a runaway or accidental full-table scan, and (2) guarantee that this protection cannot be bypassed by an individual analyst's client-side query settings. Which two configuration steps should the platform team take? **(Choose TWO.)**
+
+A. Set `BytesScannedCutoffPerQuery` to the desired byte limit on each team's workgroup.
+B. Set `EnforceWorkGroupConfiguration` to `true` on each team's workgroup.
+C. Enable `RequesterPaysEnabled` on each team's workgroup.
+D. Enable `PublishCloudWatchMetricsEnabled` on each team's workgroup.
+E. Set a bucket policy on the query results location that denies public access.
+
+**Answer: A and B.** `BytesScannedCutoffPerQuery` sets the actual per-query scan limit. `EnforceWorkGroupConfiguration` set to `true` is what makes that limit (and other workgroup settings) override whatever the client requests, turning the workgroup into a real guardrail instead of a default a user can override. C controls billing for Requester Pays S3 buckets and has nothing to do with scan limits. D only publishes metrics for monitoring; it does not enforce anything. E is a legitimate security control but does not address bytes-scanned enforcement.
+
+---
+
+**Q4.** A streaming pipeline lands clickstream data in S3 under a pattern like `s3://bucket/clickstream/dt=2026-08-21/hour=14/`, adding a new `dt`/`hour` partition every hour, and the table has accumulated several hundred thousand partitions over the years. Analysts report two problems: new data arriving in the current hour is not queryable right away, and query planning itself has become noticeably slower as the partition count has grown. Which change should the data engineer make?
+
+A. Schedule the Glue Crawler to run every 5 minutes so new partitions are picked up faster.
+B. Run `MSCK REPAIR TABLE` before every query submitted by analysts.
+C. Configure partition projection on the table, defining the `dt` and `hour` columns' patterns as table properties instead of relying on catalog-registered partitions.
+D. Convert the table's storage format from Parquet to CSV to reduce partition-related metadata overhead.
+
+**Answer: C.** Partition projection computes partition values and S3 paths algorithmically at query time instead of looking them up in the Glue Data Catalog. This removes the `GetPartitions` catalog call that slows down planning at very high partition counts, and it makes a brand-new hourly partition queryable immediately with no crawler run. A only shortens, but does not eliminate, the delay, adds crawler run cost, and does nothing for the `GetPartitions` slowdown. B adds latency to every single query and does not scale as partition count grows. D changes the file format, which is unrelated to how partition metadata is managed.
+
+---
+
+**Q5.** A team stores web log data in S3 as gzip-compressed CSV files with 40 columns per row. Their most common Athena query selects only 3 of those 40 columns with a `WHERE` clause. Data volume is large and stable, query patterns are not changing, but Athena on-demand cost keeps rising with total data volume and each query takes longer to plan and finish. Which single change will reduce the amount of data scanned MOST cost-effectively, without changing the query itself or the query engine?
+
+A. Increase the workgroup's compute capacity so queries run faster.
+B. Convert the files to Apache Parquet, keeping Snappy compression, so Athena can prune to only the 3 selected columns.
+C. Switch the compression codec from gzip to ZSTD while keeping the CSV row-based layout.
+D. Set `EnforceWorkGroupConfiguration` to `false` so analysts' client-side settings take precedence.
+
+**Answer: B.** Converting to a columnar format enables column pruning: a query selecting 3 of 40 columns only reads those 3 columns' bytes off disk, plus it enables predicate pushdown and denser compression. This directly reduces bytes scanned, which is what on-demand billing charges for. C only changes the compression codec but keeps the row-based CSV layout, so all 40 columns are still read for a 3-column query — a smaller, additive gain compared to column pruning. A does not reduce bytes scanned at all; Athena on-demand pricing is not based on adjustable per-query compute capacity. D is an access-control setting unrelated to bytes scanned or cost.
+
+---
+
+**Q6.** A data engineer needs to migrate five years of raw, unpartitioned CSV sales data into a new table that is Parquet, Snappy-compressed, and partitioned by year and month — roughly 300 total year-month partitions once fully loaded. The engineer submits a single CTAS statement with `PARTITIONED BY (year, month) AS SELECT ...`, and it fails partway through with an error referencing the per-statement partition limit. Which combination of steps should the data engineer take?
+
+A. Increase the workgroup's `BytesScannedCutoffPerQuery` and re-run the same CTAS statement unchanged.
+B. Switch the target table's format from Parquet to Apache Iceberg so a single CTAS statement can write unlimited partitions.
+C. Let the CTAS statement create the table and write the partitions it can, then load the remaining year-month partitions with one or more follow-up `INSERT INTO ... SELECT` statements, each covering up to 100 more partitions.
+D. Replace the CTAS statement with an `INSERT INTO ... VALUES` statement that inserts one row per partition manually.
+
+**Answer: C.** CTAS combined with follow-up `INSERT INTO ... SELECT` statements is AWS's documented workaround for the 100-partitions-per-statement limit: CTAS creates the table and writes an initial batch, and each additional `INSERT INTO` statement covers up to 100 more partitions until the load is complete. A does not address the failure: `BytesScannedCutoffPerQuery` limits scan cost, not partition count per statement. B is incorrect because moving to Iceberg does not lift the per-statement partition limit; that limit is not tied to Iceberg. D is the specific anti-pattern AWS recommends against — `VALUES`-style row-by-row inserts create one new small file per statement and would be impractical for loading five years of sales data across 300 partitions.
+
+---
+
+**Q7.** A data science team needs to run a custom, iterative PySpark feature-engineering pipeline against tables already registered in the Glue Data Catalog. The logic involves iterative custom transformations that do not translate cleanly into SQL. The team wants to start coding in a notebook within minutes, without provisioning or managing a persistent cluster, and the company does not currently operate a Redshift cluster. Which solution meets these requirements with the LEAST operational overhead?
+
+A. Use Redshift Spectrum to query the S3 data from a newly provisioned Redshift cluster.
+B. Use Athena's Spark engine through a notebook in the Athena console, which reads table metadata from the Glue Data Catalog.
+C. Provision a long-running Amazon EMR cluster and submit the PySpark job to it.
+D. Rewrite the feature-engineering logic as an Athena SQL `CTAS` statement.
+
+**Answer: B.** Athena for Apache Spark gives near-instant notebook session start on a configured workgroup, requires no cluster to size or patch, and reads the same Glue Data Catalog as Athena SQL — a direct fit for custom, iterative Spark logic with minimal setup. A requires provisioning and paying for a Redshift cluster the company does not have, and Redshift Spectrum is a SQL-only interface, not a Spark notebook environment. C can run the same PySpark code but requires provisioning and managing a persistent cluster, which is exactly the operational overhead the team wants to avoid. D is not viable because the scenario states the logic does not translate cleanly into SQL.
+
+---
+
+**Q8.** A team has connected Athena Federated Query to a production Amazon DynamoDB table using the DynamoDB connector, so they can join live order data with historical order archives already stored as Parquet in S3. Two requests come in: (1) an analyst wants to periodically snapshot the joined DynamoDB + S3 result set into a new, Parquet-formatted table in S3 for fast repeated queries later, and (2) an engineer proposes writing new rows directly into the DynamoDB table using an `INSERT INTO` statement run from Athena. Which two statements are correct? **(Choose TWO.)**
+
+A. The analyst's snapshot requirement can be met by running a CTAS statement that selects from the federated query and writes a new table to S3.
+B. The engineer's `INSERT INTO` proposal will succeed, because `INSERT INTO` has worked on ordinary Athena tables since before Iceberg was supported.
+C. The engineer's `INSERT INTO` proposal will fail, because Federated Query is read-only from Athena's side and does not support `INSERT INTO` against a federated source.
+D. Both requests will fail, because a Federated Query result cannot be used as input to any other Athena SQL statement.
+E. The engineer's `INSERT INTO` proposal will succeed only if the DynamoDB table is first converted to the Apache Iceberg table format.
+
+**Answer: A and C.** CTAS can materialize any `SELECT` result, including one built on a federated join, into a new S3 table — this is the standard pattern for turning a federated query into a fast, reusable dataset. Separately, Athena documents `INSERT INTO` as unsupported against federated data sources regardless of the target system, so the engineer's proposal fails. B states a true general fact about ordinary Glue Data Catalog tables, but it is the wrong answer here: the federated-source restriction overrides the general rule for this specific target. D is wrong because the analyst's CTAS snapshot does succeed. E is wrong because the federated-source restriction is not about table format — converting to Iceberg does not make a federated source writable from Athena.
