@@ -40,6 +40,16 @@ You already covered the Glue Data Catalog and Glue Crawlers. Athena depends on t
 
 This is the same relationship as: Glue Crawler = one way to populate the catalog (automatic, by inferring schema from files); Athena `CREATE EXTERNAL TABLE` = the other way to populate the catalog (manual, you declare the schema yourself). Both roads lead to the same catalog.
 
+The diagram below shows why Athena counts as "serverless": there is no box in this picture that you provision, patch, or scale yourself. Athena has no storage and no metastore of its own — it borrows both from S3 and the Glue Data Catalog, and spins up query compute only for the duration of the query.
+
+```mermaid
+flowchart LR
+    User["User / BI tool<br/>submits SQL"] --> Engine
+    Engine["Athena query engine<br/>(Trino / Presto / Spark)<br/>on-demand, no persistent cluster"] -->|"reads schema"| Catalog[("Glue Data Catalog<br/>(metastore)")]
+    Engine -->|"reads data files"| RawS3[("Amazon S3<br/>source data")]
+    Engine -->|"writes output"| ResultsS3[("Amazon S3<br/>query results")]
+```
+
 ---
 
 ## 2. Workgroups

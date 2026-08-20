@@ -28,6 +28,20 @@ A core node runs tasks and stores data in HDFS. The HDFS DataNode process runs o
 
 A task node runs tasks only. It does not store HDFS data. Task nodes are optional. You add them purely for extra compute power when a job needs more parallelism than the core nodes provide.
 
+```mermaid
+flowchart TD
+    Master["Master (Primary) Node<br/>Coordinates the cluster<br/>YARN ResourceManager + HDFS NameNode<br/>No HDFS storage"]
+    Core1["Core Node<br/>Runs tasks + stores HDFS data (DataNode)"]
+    Core2["Core Node<br/>Runs tasks + stores HDFS data (DataNode)"]
+    Task1["Task Node (optional)<br/>Runs tasks only, no HDFS storage"]
+    Task2["Task Node (optional)<br/>Runs tasks only, no HDFS storage"]
+
+    Master --> Core1
+    Master --> Core2
+    Master -. optional .-> Task1
+    Master -. optional .-> Task2
+```
+
 ### Why only the master node is strictly required
 
 A one-node EMR cluster is possible. In that case, the single node acts as master, core, and task at once. Core and task nodes exist to scale out compute and storage beyond what one node offers. They are not required for the cluster to function.
@@ -104,6 +118,19 @@ An EMR Serverless application moves through these states:
 - **STOPPING** — jobs have finished, capacity is being released
 - **STOPPED** — no resources running; can be restarted or reconfigured
 - **TERMINATED** — permanently deleted, no longer listed
+
+```mermaid
+stateDiagram-v2
+    [*] --> CREATING
+    CREATING --> CREATED
+    CREATED --> STARTING
+    STARTING --> STARTED
+    STARTED --> STOPPING
+    STOPPING --> STOPPED
+    STOPPED --> STARTING : restart
+    STOPPED --> TERMINATED
+    TERMINATED --> [*]
+```
 
 The README's diagram is consistent with this list; it just does not name every intermediate state. The important exam point: **you are billed for the resources an application holds while STARTED (and while jobs run on it)**. Because an application can sit idle in the STARTED state without auto-stopping (unless you configure auto-stop), you must explicitly stop or terminate it to guarantee billing stops — the same idle-cost trap as a persistent EMR-on-EC2 cluster, just at the application level instead of the cluster level.
 

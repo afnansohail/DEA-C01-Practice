@@ -60,6 +60,19 @@ Tables carry **schema versioning** — the Catalog keeps a history of schema ver
 
 A crawler connects to a data store (S3, JDBC, DynamoDB, etc.), infers schema by sampling objects, and writes (or updates) tables in the Data Catalog. It is the "primary method" the README describes, and that's accurate — but the README stops at "it creates tables," which undersells what you need to know for the exam.
 
+The diagram below ties together the pieces from §2 (Data Catalog), §4 (Tables), this section (Crawler), and §8 (ETL Job), which the README covers as separate topics without showing how data actually moves through them end to end:
+
+```mermaid
+flowchart LR
+    A[Raw Data in S3] --> B[Glue Crawler]
+    B --> C[(Glue Data Catalog)]
+    A --> D[Glue ETL Job\nSpark / Python Shell]
+    C --> D
+    D --> E[Processed Output\nS3 / Redshift]
+```
+
+The crawler only ever reads S3 (or another source) to infer schema and write Catalog metadata (§5.4); the ETL job is the piece that actually reads the raw data and writes transformed output, using the Catalog's schema/location metadata to know where to read from.
+
 ### 5.1 Classifiers — how schema inference actually works
 
 A crawler doesn't guess blindly; it runs **classifiers** against sample data to determine format and schema:
@@ -202,6 +215,17 @@ A scheduled trigger uses a cron expression with 5-minute-level minimum granulari
 ### 9.2 AWS Glue Workflows
 
 A **Workflow** chains multiple crawlers, jobs, and triggers into a single DAG that Glue tracks and visualizes as one unit, with **workflow run properties** — a shared key/value store all the workflow's jobs can read/write, which is how one job passes a value (e.g., a row count or a computed date) to the next job in the same workflow run. Workflows are the right answer when every step is a Glue-native object (crawler, job, trigger) and you don't need to coordinate non-Glue AWS services.
+
+A workflow is literally graph-shaped — triggers are the edges that connect crawler/job nodes into a DAG:
+
+```mermaid
+flowchart LR
+    T1[Trigger: Scheduled] --> C1[Crawler: raw_data]
+    C1 --> T2[Trigger: Conditional\non crawler success]
+    T2 --> J1[Job: ETL Transform]
+    J1 --> T3[Trigger: Conditional\non job success]
+    T3 --> C2[Crawler: processed_data]
+```
 
 ### 9.3 Orchestration alternatives
 

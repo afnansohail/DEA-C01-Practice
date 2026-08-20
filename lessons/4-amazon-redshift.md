@@ -36,6 +36,34 @@ Why this matters: a query is only as fast as its **slowest slice**. If a distrib
 
 Data flow for a query: client → leader node (parse, plan, distribute plan to compute nodes) → compute nodes execute in parallel across their slices → compute nodes return partial results to leader → leader aggregates/sorts → result to client.
 
+```mermaid
+flowchart TD
+    Client(["Client / BI tool / SQL query"]) --> Leader["Leader Node<br/>parse, plan, coordinate, aggregate final result"]
+
+    subgraph CN1 ["Compute Node 1"]
+        S1["Slice"]
+        S2["Slice"]
+    end
+    subgraph CN2 ["Compute Node 2"]
+        S3["Slice"]
+        S4["Slice"]
+    end
+    subgraph CN3 ["Compute Node N"]
+        S5["Slice"]
+        S6["Slice"]
+    end
+
+    Leader -->|distributes query plan| CN1
+    Leader -->|distributes query plan| CN2
+    Leader -->|distributes query plan| CN3
+
+    CN1 -->|partial results| Leader
+    CN2 -->|partial results| Leader
+    CN3 -->|partial results| Leader
+
+    Leader --> Client
+```
+
 ---
 
 ## 2. Durability and the three resize methods
@@ -121,6 +149,25 @@ The scenario: an encrypted Redshift cluster's automated/manual snapshots need to
 3. **In the source region, enable cross-region snapshot copy on the cluster, pointing it at the destination region and the copy grant created in step 2.** This is the switch that actually starts the ongoing snapshot replication; it needs the grant from step 2 as a parameter because that's what tells the source cluster's copy process which destination key/grant to use for re-encryption.
 
 The ordering is not arbitrary: you cannot create a grant for a key that does not exist yet (step 1 before 2), and you cannot enable copying while referencing a grant that does not exist yet (step 2 before 3). If the source cluster is unencrypted, the KMS key/grant steps are unnecessary — this whole dance is specifically for KMS-encrypted clusters.
+
+The diagram below shows the same three steps as a cross-region dependency chain: everything in the destination region must exist before the source region can reference it.
+
+```mermaid
+sequenceDiagram
+    participant D as Destination region (e.g. us-west-2)
+    participant S as Source region (e.g. us-east-1)
+
+    Note over D: Step 1
+    D->>D: Create KMS key
+
+    Note over D: Step 2
+    D->>D: Create snapshot copy grant<br/>(references the KMS key from Step 1)
+
+    Note over S: Step 3
+    S->>D: Enable cross-region snapshot copy<br/>(references the copy grant from Step 2)
+
+    Note over S,D: Ongoing: snapshots replicate<br/>from source to destination automatically
+```
 
 ---
 
